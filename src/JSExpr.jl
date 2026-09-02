@@ -5,7 +5,7 @@ module JSExpr
 using JSON, MacroTools, WebIO
 export JSString, @js, @js_str, @var, @new
 
-import WebIO: JSString, JSONContext, JSEvalSerialization, scopeid
+import WebIO: JSString, scopeid
 using Observables: AbstractObservable
 
 macro js(expr)
@@ -16,8 +16,23 @@ end
 
 jsexpr(x::JSString) = x.s
 jsexpr(x::Symbol) = (x==:nothing ? "null" : string(x))
-jsexpr(x) = sprint(x) do io, s
-    JSON.show_json(io, JSEvalSerialization(), s)
+# JSON.jl v1 replaced the `show_json`/serialization-context API with `JSON.json`
+# and `JSONStyle`. Both branches serialize `x` as JSON, except that `JSString`
+# fragments are spliced in as raw JavaScript instead of being quoted. Under
+# JSON.jl v1, `sort_keys=false` keeps object keys in `Dict` iteration order,
+# which is what JSON.jl < 1 does, so the emitted JavaScript is byte-identical
+# either way.
+@static if isdefined(JSON, :JSONStyle) # JSON.jl >= 1
+    struct JSEvalStyle <: JSON.JSONStyle end
+    JSON.lower(::JSEvalStyle, x::JSString) = JSON.JSONText(x.s)
+
+    jsexpr(x) = JSON.json(x; style=JSEvalStyle(), sort_keys=false)
+else
+    import WebIO: JSEvalSerialization
+
+    jsexpr(x) = sprint(x) do io, s
+        JSON.show_json(io, JSEvalSerialization(), s)
+    end
 end
 jsexpr(x::QuoteNode) = x.value isa Symbol ? jsexpr(string(x.value)) : jsexpr(x.value)
 jsexpr(x::LineNumberNode) = nothing

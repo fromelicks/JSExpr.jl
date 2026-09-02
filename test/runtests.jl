@@ -70,6 +70,24 @@ end
         end
     end) == js"var acc=0; for(var i = 1; i <= 10; i = i + 2){acc+=1}"
 
+    @testset "value interpolation" begin
+        # `JSString`s nested inside an interpolated value are spliced in as raw
+        # JavaScript instead of being serialized as JSON strings.
+        obj = Dict("a" => js"f()")
+        @test @js($obj) == js"{\"a\":f()}"
+
+        arr = [js"f()", 1, "s"]
+        @test @js($arr) == js"[f(),1,\"s\"]"
+
+        nested = Dict("a" => Dict("b" => js"y+1"))
+        @test @js($nested) == js"{\"a\":{\"b\":y+1}}"
+
+        # Object keys keep `Dict` iteration order (JSON.jl v1 sorts them by
+        # default).
+        d = Dict("type" => "t", "scope" => "s", "name" => "n", "id" => "i")
+        @test @js($d).s == "{" * join(("\"$k\":\"$v\"" for (k, v) in d), ",") * "}"
+    end
+
     @testset "observable interpolation" begin
         w = Scope()
         ob = Observable(0)
