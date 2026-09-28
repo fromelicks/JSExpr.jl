@@ -21,10 +21,12 @@ jsexpr(x::Symbol) = (x==:nothing ? "null" : string(x))
 # fragments are spliced in as raw JavaScript instead of being quoted. Under
 # JSON.jl v1, `sort_keys=false` keeps object keys in `Dict` iteration order,
 # which is what JSON.jl < 1 does, so the emitted JavaScript is byte-identical
-# either way.
+# either way. Likewise, non-finite floats are written as `null` as JSON.jl < 1
+# does, where JSON.jl v1 would throw instead.
 @static if isdefined(JSON, :JSONStyle) # JSON.jl >= 1
     struct JSEvalStyle <: JSON.JSONStyle end
     JSON.lower(::JSEvalStyle, x::JSString) = JSON.JSONText(x.s)
+    JSON.lower(::JSEvalStyle, x::AbstractFloat) = isfinite(x) ? x : nothing
 
     jsexpr(x) = JSON.json(x; style=JSEvalStyle(), sort_keys=false)
 else

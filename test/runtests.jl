@@ -86,6 +86,10 @@ end
         # default).
         d = Dict("type" => "t", "scope" => "s", "name" => "n", "id" => "i")
         @test @js($d).s == "{" * join(("\"$k\":\"$v\"" for (k, v) in d), ",") * "}"
+
+        # Non-finite floats become `null` (JSON.jl v1 throws on them by default).
+        floats = [1.5, NaN, Inf, -Inf]
+        @test @js($floats) == js"[1.5,null,null,null]"
     end
 
     @testset "observable interpolation" begin
